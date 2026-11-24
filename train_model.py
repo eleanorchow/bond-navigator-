@@ -1,0 +1,122 @@
+"""
+Bond Navigator: train the project-delay forecast on SYNTHETIC data.
+
+Why this model exists
+A performance bond must stay valid until the project (plus its defects period)
+is finished. If the project runs late, the bond must be extended BEFORE it
+expires, or the client can send an "extend or pay" demand. A simple date
+reminder only knows the expiry date. This model forecasts how late a project
+will finish, using only signals DBS already sees in IDEAL: the progress
+payments coming in from the client.
+
+What the script does
+1. Simulates 6,000 contractor projects (6 to 30 months long, many run late).
+2. Looks at each project part-way through and builds 3 signals:
+     gap_months     how many months of work the project is behind plan,
+                    judged from the share of the contract already paid
+     payment_delay  how much later than monthly the client's payments arrive
+     elapsed_share  how far through the planned schedule we are
+                    (falling behind early tends to snowball)
+3. Fits a linear regression (one visible weight per signal, so the app can
+   explain every forecast).
+4. Compares it with "assume the project finishes on time".
+5. Writes model/weights.json and js/model-weights.js (loaded by index.html).
+
+Run:  python model/train_model.py     (needs numpy, scikit-learn)
+"""
+
+import json
+import os
+from datetime import date
+
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import train_test_split
+
+SEED = 21
+N_PROJECTS = 6000
+LATE_FROM_MONTHS = 1.0   # a delay of 1 month or more means the bond needs extending
+
+FEATURES = [
+    ("gap_months",    "Months of work behind plan (from progress payments)"),
+    ("payment_delay", "Client payments arriving later than monthly"),
+    ("elapsed_share", "Share of the planned schedule already used"),
+]
+
+
+def simulate(n, rng):
+    rows, delays, notice = [], [], []
+    for _ in range(n):
+        duration = rng.uniform(6, 30)                      # planned months
+        slowdown = max(rng.lognormal(-2.0, 0.9) - 0.05, -0.05)  # most projects run a bit late
+        if rng.random() < 0.25:
+            slowdown += rng.uniform(0.1, 0.5)              # a quarter hit real trouble
+        delay = duration * slowdown                        # months late at completion
+        elapsed = rng.uniform(0.3, 0.9)                    # we look part-way through
+        true_progress = min(1.0, elapsed / (1 + slowdown))
+        cert_lag = rng.uniform(0.0, 0.06)                  # certification lags real work
+        certified = float(np.clip(true_progress - cert_lag + rng.normal(0, 0.03), 0, 1))
+        gap_months = max(elapsed - certified, 0) * duration
+        payment_delay = float(np.clip((slowdown * 15 + rng.normal(4, 8)) / 30, 0, 2))
+        rows.append([gap_months, payment_delay, elapsed])
+        delays.append(delay)
+        notice.append(duration * (1 - elapsed))           # months left before planned completion
+    return np.array(rows), np.array(delays), np.array(notice)
+
+
+def main():
+    rng = np.random.default_rng(SEED)
+    X, y, notice = simulate(N_PROJECTS, rng)
+    X_tr, X_te, y_tr, y_te, _, n_te = train_test_split(X, y, notice, test_size=0.3, random_state=SEED)
+
+    model = LinearRegression()
+    model.fit(X_tr, y_tr)
+    pred = np.maximum(model.predict(X_te), 0)
+
+    needs_ext = y_te >= LATE_FROM_MONTHS
+    flagged = pred >= LATE_FROM_MONTHS
+    caught = flagged & needs_ext
+    out = {
+        "model": "Linear regression (explainable delay forecast)",
+        "trained_on": "SYNTHETIC projects only, for prototype demonstration",
+        "trained_date": date.today().isoformat(),
+        "n_projects": N_PROJECTS,
+        "intercept": round(float(model.intercept_), 4),
+        "features": [
+            {"key": k, "label": label, "weight": round(float(w), 4)}
+            for (k, label), w in zip(FEATURES, model.coef_)
+        ],
+        "late_from_months": LATE_FROM_MONTHS,
+        "evaluation": {
+            "test_projects": int(len(y_te)),
+            "needing_extension": int(needs_ext.sum()),
+            "mae_months_ai": round(float(mean_absolute_error(y_te, pred)), 2),
+            "mae_months_on_schedule": round(float(mean_absolute_error(y_te, np.zeros_like(y_te))), 2),
+            "extensions_spotted": int(caught.sum()),
+            "extensions_spotted_share": round(float(caught.sum() / max(needs_ext.sum(), 1)), 3),
+            "false_alarms": int((flagged & ~needs_ext).sum()),
+            "median_notice_months_ai": round(float(np.median(n_te[caught])), 1),
+            "notice_months_date_reminder": 1.0,
+        },
+    }
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(here)
+    with open(os.path.join(here, "weights.json"), "w") as f:
+        json.dump(out, f, indent=2)
+    with open(os.path.join(root, "js", "model-weights.js"), "w") as f:
+        f.write("// Generated by model/train_model.py. Do not edit by hand.\n")
+        f.write("window.BOND_MODEL = ")
+        json.dump(out, f, indent=2)
+        f.write(";\n")
+
+    print("Weights:")
+    for feat in out["features"]:
+        print(f"  {feat['key']:<14} {feat['weight']:+.3f}")
+    print(f"  intercept      {out['intercept']:+.3f}")
+    print("Evaluation:", json.dumps(out["evaluation"], indent=2))
+
+
+if __name__ == "__main__":
+    main()

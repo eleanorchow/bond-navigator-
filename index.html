@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bond Navigator</title>
+  <meta name="description" content="Student concept prototype: an AI feature that tells SME contractors when to extend, reduce or release their bank guarantees.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="disclaimer">Student concept prototype inspired by DBS IDEAL. Not a DBS product or website. No login, and all companies, projects and amounts are fictional.</div>
+
+  <header class="appbar">
+    <div class="appbar-left">
+      <span class="mark" aria-hidden="true">BN</span>
+      <div class="brandtext"><b>Bond Navigator</b><span>Concept feature for bank guarantees in corporate banking</span></div>
+    </div>
+    <div class="appbar-right" id="who"></div>
+  </header>
+
+  <div class="shell">
+    <nav class="sidenav" id="sidenav" aria-label="Main menu"></nav>
+
+    <main id="main">
+      <section class="view" id="view-bonds" aria-labelledby="h-bonds">
+        <div class="page-head">
+          <h1 id="h-bonds">Bond Navigator</h1>
+          <p>Tracks every bank guarantee you have with DBS and tells you when to extend, reduce or release it.</p>
+        </div>
+        <div id="killSlot"></div>
+        <div class="panel linecard" id="lineCard"></div>
+        <div class="chips" id="typeChips"></div>
+        <div class="stage-note" id="typeNote"></div>
+        <div class="split">
+          <div class="panel list" id="bondList"></div>
+          <div class="panel detail" id="bondCard" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-results" aria-labelledby="h-results" hidden>
+        <div class="page-head">
+          <h1 id="h-results">Pilot results</h1>
+          <p>How Bond Navigator compares with a simple expiry reminder, and who pays for the AI.</p>
+        </div>
+        <div id="results"></div>
+      </section>
+
+      <section class="view" id="view-governance" aria-labelledby="h-gov" hidden>
+        <div class="page-head">
+          <h1 id="h-gov">Governance</h1>
+          <p>Kill switch, safety nets, model card and audit trail.</p>
+        </div>
+        <div id="governance"></div>
+      </section>
+
+      <footer>Forecast weights come from <code>model/train_model.py</code>, trained on synthetic projects. Fee and cost figures are assumptions.</footer>
+    </main>
+  </div>
+
+  <script src="js/model-weights.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

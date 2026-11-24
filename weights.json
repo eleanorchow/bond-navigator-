@@ -1,0 +1,36 @@
+{
+  "model": "Linear regression (explainable delay forecast)",
+  "trained_on": "SYNTHETIC projects only, for prototype demonstration",
+  "trained_date": "2026-11-24",
+  "n_projects": 6000,
+  "intercept": 1.9889,
+  "features": [
+    {
+      "key": "gap_months",
+      "label": "Months of work behind plan (from progress payments)",
+      "weight": 2.1195
+    },
+    {
+      "key": "payment_delay",
+      "label": "Client payments arriving later than monthly",
+      "weight": 3.2977
+    },
+    {
+      "key": "elapsed_share",
+      "label": "Share of the planned schedule already used",
+      "weight": -6.0637
+    }
+  ],
+  "late_from_months": 1.0,
+  "evaluation": {
+    "test_projects": 1800,
+    "needing_extension": 1219,
+    "mae_months_ai": 1.5,
+    "mae_months_on_schedule": 4.08,
+    "extensions_spotted": 1125,
+    "extensions_spotted_share": 0.923,
+    "false_alarms": 197,
+    "median_notice_months_ai": 6.8,
+    "notice_months_date_reminder": 1.0
+  }
+}
